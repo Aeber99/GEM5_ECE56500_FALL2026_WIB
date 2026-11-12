@@ -43,6 +43,7 @@
 
 #include <queue>
 #include <set>
+#include <vector>
 
 #include "base/statistics.hh"
 #include "cpu/o3/comm.hh"
@@ -86,6 +87,12 @@ class FUPool;
  */
 class IEW
 {
+  private:
+    // WIB miss detection
+    /*std::vector<int>*/ int missDetectCounter[32];
+    /*std::vector<bool>*/ bool missDetectValid[32];
+    /*std::vector<int>*/ int missDetectID[32];
+
   public:
     /** Overall IEW stage status. Used to determine if the CPU can
      * deschedule itself due to a lack of activity.

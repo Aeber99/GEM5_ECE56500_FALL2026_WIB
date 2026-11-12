@@ -1212,6 +1212,20 @@ IEW::executeInsts()
             } else if (inst->isLoad()) {
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
+
+                // "allocate" a miss detection counter
+                for (int i = 0; i < 32; i++)
+                {
+                    if (!missDetectValid[i])
+                    {
+                        missDetectValid[i] = true;
+                        missDetectID[i] = inst->seqNum;
+                        missDetectCounter[i] = 0;
+                        break;
+                    }
+                }
+
+
                 fault = ldstQueue.executeLoad(inst);
 
                 if (inst->isTranslationDelayed() &&
@@ -1459,6 +1473,11 @@ IEW::tick()
 
     if (exeStatus != Squashing) {
         executeInsts();
+
+        for (size_t i = 0; i < count; i++)
+        {
+            /* code */
+        }
 
         writebackInsts();
 
