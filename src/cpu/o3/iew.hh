@@ -55,6 +55,7 @@
 #include "cpu/timebuf.hh"
 #include "debug/IEW.hh"
 #include "sim/probe/probe.hh"
+#include "cpu/o3/wib.hh"
 
 namespace gem5
 {
@@ -377,6 +378,9 @@ class IEW
     void printAvailableInsts();
 
   public:
+
+    wib WIB;
+    
     /** Instruction queue. */
     InstructionQueue instQueue;
 

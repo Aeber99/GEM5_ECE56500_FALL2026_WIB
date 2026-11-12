@@ -65,7 +65,7 @@ class wib : public Named
   public:
     wib(CPU *_cpu, const BaseO3CPUParams &params);
 
-    void allocate_frame(const DynInstPtr &inst); //allocate with new ROB entry
+    void allocate_frame(const DynInstPtr &inst); //allocate with new ROB entry 
     int allocateBitVector(InstSeqNum load_num, ThreadID tid); //load misses, allocate vector, !!! if it returns -1, vectors are full
     void load_frame_in(const DynInstPtr &inst, unsigned col); //dependent on load miss, put into WIB
     void freeLoad(InstSeqNum load_num); //load returns, column done

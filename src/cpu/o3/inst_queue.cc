@@ -294,6 +294,7 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
     ADD_STAT(fuBusyRate, statistics::units::Rate<
                 statistics::units::Count, statistics::units::Count>::get(),
              "FU busy rate (busy events/executed inst)")
+             
 {
     instsAdded
         .prereq(instsAdded);
@@ -400,6 +401,30 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
         ;
     fuBusyRate = fuBusy / instsIssued;
 }
+
+
+
+/* stuff */
+bool InstructionQueue:: addMissCounter(InstSeqNum load_num){
+    if (bitvectorcounter > bitvectorsize){
+        bitvectorcounter++;
+        loadVector[bitvectorcounter] = load_num;
+        return true;
+    }
+    else return false
+}
+
+void  InstructionQueue:: reduceMissCounter(InstSeqNum load_num){
+    loadVector[bitvectorcounter] = 0;
+    bitvec
+}
+
+
+
+
+
+
+
 
 InstructionQueue::IQIOStats::IQIOStats(statistics::Group *parent)
     : statistics::Group(parent),
@@ -1659,5 +1684,5 @@ InstructionQueue::dumpInsts()
     }
 }
 
-} // namespace o3
+} // namespace o3 
 } // namespace gem5
