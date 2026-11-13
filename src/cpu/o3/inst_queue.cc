@@ -169,6 +169,83 @@ InstructionQueue::~InstructionQueue()
             dependGraph.nodesTraversed, dependGraph.nodesRemoved);
 #endif
 }
+/* stuff */
+bool
+InstructionQueue::addMissCounter(InstSeqNum load_num) //counter to track columns of bit vectors
+{
+    if (bitvectorcounter >= bitvectorsize) { return false; } //full
+
+    //already in (split load)
+    missnodecurr = misshead;
+    while (curr != nullptr) {
+        if (curr->load_num == load_num) { return false; }
+        curr = curr->next;
+    }
+
+    //new node at head, order doesnt matter
+    missnode node = new missnode;
+    node->load_num = load_num;
+    node->next = misshead;
+    misshead = node;
+
+    bitvectorcounter++;
+    return true;
+}
+
+//load came back or squashed, take out of list
+void
+InstructionQueue::reduceMissCounter(InstSeqNum load_num)
+{
+    missnode dummy;
+    dummy.next = misshead;
+    missnodeprev = &dummy;
+
+    while (prev->next != nullptr) {
+        missnode curr = prev->next;
+        if (curr->load_num == load_num) {
+            prev->next = curr->next; //unlink
+            delete curr;
+            bitvectorcounter--;
+            break;
+        }
+        prev = curr;
+    }
+    misshead = dummy.next;
+    //not found (hit or already removed) nothing happens
+}
+
+// //free whole list
+// void
+// InstructionQueue::clearMissList()
+// {
+//     while (misshead != nullptr) {
+//         missnodenext = misshead->next;
+//         delete misshead;
+//         misshead = next;
+//     }
+//     bitvectorcounter = 0;
+// }
+
+void
+InstructionQueue::squashMissList(InstSeqNum squashed_sn)
+{
+    missnode dummy;
+    dummy.next = misshead;
+    missnode prev = &dummy;
+
+    while (prev->next != nullptr) {
+        missnodecurr = prev->next;
+        if (curr->load_num > squashed_sn) {
+            prev->next = curr->next; //unlink
+            delete curr;
+            bitvectorcounter--;
+            //dont move prev, prev->next is already the next node
+        } else {
+            prev = curr;
+        }
+    }
+    misshead = dummy.next;
+}
 
 std::string
 InstructionQueue::name() const

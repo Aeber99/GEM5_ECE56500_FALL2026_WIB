@@ -89,9 +89,28 @@ class IEW
 {
   private:
     // WIB miss detection
-    /*std::vector<int>*/ int missDetectCounter[32];
-    /*std::vector<bool>*/ bool missDetectValid[32];
-    /*std::vector<int>*/ int missDetectID[32];
+    int missDetectCounter[32] = {};
+    bool missDetectValid[32] = {};
+    InstSeqNum missDetectID[32] = {};
+
+    /** Number of cycles an in-flight load may take before it is
+     * considered a cache miss (should be >= the L1D hit latency). */
+    static constexpr int missDetectThreshold = 3;
+    static constexpr int missDetectEntries = 32;
+
+    /** Allocate a counter for a load (no-op if it already has one). */
+    void missDetectAllocate(InstSeqNum seq_num);
+    /** Increment all valid counters; called once per cycle. */
+    void missDetectTick();
+    /** Reset+invalidate the counter owned by seq_num (hit/complete). */
+    void missDetectRelease(InstSeqNum seq_num);
+    /** Reset+invalidate all counters owned by loads younger than seq_num. */
+    void missDetectSquash(InstSeqNum seq_num);
+    /** if any load has been in flight long enough to be classified as a cache miss, 
+    allocate a "bit vector" (miss counter) 
+    mark load as waiting, allocate miss dependency list
+    */
+    void detectMisses();
 
   public:
     /** Overall IEW stage status. Used to determine if the CPU can

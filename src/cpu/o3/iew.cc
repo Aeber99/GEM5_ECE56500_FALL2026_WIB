@@ -416,9 +416,78 @@ IEW::takeOverFrom()
 }
 
 void
+IEW::missDetectAllocate(InstSeqNum seq_num)
+{
+    int free_slot = -1;
+    for (int i = 0; i < missDetectEntries; i++) {
+        if (missDetectValid[i]) {
+            if (missDetectID[i] == seq_num)
+                return; // replayed load keeps its counter
+        } else if (free_slot < 0) {
+            free_slot = i;
+        }
+    }
+    if (free_slot >= 0) {
+        missDetectValid[free_slot] = true;
+        missDetectID[free_slot] = seq_num;
+        missDetectCounter[free_slot] = 0;
+    }
+}
+
+void
+IEW::missDetectTick()
+{
+    for (int i = 0; i < missDetectEntries; i++) {
+        if (missDetectValid[i] && missDetectCounter[i] < missDetectThreshold)
+            missDetectCounter[i]++;
+    }
+}
+
+void
+IEW::missDetectRelease(InstSeqNum seq_num)
+{
+    for (int i = 0; i < missDetectEntries; i++) {
+        if (missDetectValid[i] && missDetectID[i] == seq_num) {
+            missDetectValid[i] = false;
+            missDetectCounter[i] = 0;
+            missDetectID[i] = 0;
+        }
+    }
+}
+
+void
+IEW::missDetectSquash(InstSeqNum seq_num)
+{
+    for (int i = 0; i < missDetectEntries; i++) {
+        if (missDetectValid[i] && missDetectID[i] > seq_num) {
+            missDetectValid[i] = false;
+            missDetectCounter[i] = 0;
+            missDetectID[i] = 0;
+        }
+    }
+}
+
+void
+IEW::detectMisses() const
+{
+    for (int i = 0; i < missDetectEntries; i++) {
+        if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
+
+            addMissCounter(missDetectID[i]); // bit vector limit counter
+            
+
+        }
+    }
+    return false;
+}
+
+void
 IEW::squash(ThreadID tid)
 {
     DPRINTF(IEW, "[tid:%i] Squashing all instructions.\n", tid);
+
+    // Free miss detection counters of squashed loads.
+    missDetectSquash(fromCommit->commitInfo[tid].doneSeqNum);
 
     // Tell the IQ to start squashing.
     instQueue.squash(tid);
@@ -1213,18 +1282,7 @@ IEW::executeInsts()
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
 
-                // "allocate" a miss detection counter
-                for (int i = 0; i < 32; i++)
-                {
-                    if (!missDetectValid[i])
-                    {
-                        missDetectValid[i] = true;
-                        missDetectID[i] = inst->seqNum;
-                        missDetectCounter[i] = 0;
-                        break;
-                    }
-                }
-
+                missDetectAllocate(inst->seqNum);
 
                 fault = ldstQueue.executeLoad(inst);
 
@@ -1405,6 +1463,10 @@ IEW::writebackInsts()
         DynInstPtr inst = toCommit->insts[inst_num];
         ThreadID tid = inst->threadNumber;
 
+        // Load finished (hit, or miss data returned): free its counter.
+        if (inst->isLoad())
+            missDetectRelease(inst->seqNum);
+
         DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
                 inst->seqNum, inst->pcState());
 
@@ -1474,12 +1536,11 @@ IEW::tick()
     if (exeStatus != Squashing) {
         executeInsts();
 
-        for (size_t i = 0; i < count; i++)
-        {
-            /* code */
-        }
-
         writebackInsts();
+
+        missDetectTick();
+
+
 
         // Have the instruction queue try to schedule any ready instructions.
         // (In actuality, this scheduling is for instructions that will
