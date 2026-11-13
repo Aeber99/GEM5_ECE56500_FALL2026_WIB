@@ -264,8 +264,8 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num,
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
             regWaitOrigin[dest_reg->flatIndex()] = load_num;
+            regWaiting[dest_reg->flatIndex()] = true;
         }
-        regWaiting[dest_reg->flatIndex()] = true;
     }
 
     inst->setWaiting();
@@ -321,8 +321,8 @@ InstructionQueue::movefromwib(const DynInstPtr &inst)
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
             regWaitOrigin[dest_reg->flatIndex()] = -1;
+            regWaiting[dest_reg->flatIndex()] = false;
         }
-        regWaiting[dest_reg->flatIndex()] = false;
     }
 
     missnode *node = findloadnum(load_num);
@@ -358,8 +358,8 @@ InstructionQueue::unwib(DynInstPtr inst, InstSeqNum load_num)
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
             regWaitOrigin[dest_reg->flatIndex()] = -1;
+            regWaiting[dest_reg->flatIndex()] = false;
         }
-        regWaiting[dest_reg->flatIndex()] = false;
     }
 
     //nothing was wibinst for it, free now
@@ -381,6 +381,29 @@ InstructionQueue::drainwib()
         if (node == nullptr || !node->unwib) { continue; }   // load not back yet
 
         movefromwib(inst);
+
+        // The instruction was parked on one load only. If another source
+        // is still produced by something in the WIB (or by a missed load
+        // that has not returned), park it again on that load instead of
+        // letting it take an IQ entry it cannot use; otherwise such
+        // instructions can fill the IQ and block the drain for good.
+        bool reparked = false;
+        for (int i = 0; i < inst->numSrcRegs() && !reparked; i++) {
+            PhysRegIdPtr src_reg = inst->renamedSrcIdx(i);
+            if (src_reg->isFixedMapping() ||
+                !regWaiting[src_reg->flatIndex()]) {
+                continue;
+            }
+            reparked = movetowib(inst, regWaitOrigin[src_reg->flatIndex()],
+                                 true);
+        }
+        if (reparked) {
+            // Never left the WIB, so it uses neither dispatch-side WIB
+            // width nor unwib width.
+            wibbedThisCycle--;
+            continue;
+        }
+
         addIfReady(inst);
         wibMoved++;
     }
@@ -1000,6 +1023,22 @@ InstructionQueue::scheduleReadyInsts()
 
         DynInstPtr issuing_inst = readyInsts[op_class].top();
 
+        // dont consider waiting instruction for readiness (maybe uneeded)
+        // if (issuing_inst->isWaiting())
+        // {
+        //     continue;
+        // }
+
+        int8_t total_src_regs = issuing_inst->numSrcRegs();
+        for (int src_reg_idx = 0;
+         src_reg_idx < total_src_regs;
+         src_reg_idx++)
+        {
+            PhysRegIdPtr src_reg = new_inst->renamedSrcIdx(src_reg_idx);
+            if(src_reg->flat)
+
+        }
+
         if (issuing_inst->isFloating()) {
             iqIOStats.fpInstQueueReads++;
         } else if (issuing_inst->isVector()) {
@@ -1261,9 +1300,12 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
             // ready.  However that would mean that the dependency
             // graph entries would need to hold the src_reg_idx.
             
-            if (!dep_inst->isWaiting()) { addIfReady(dep_inst); } //stuff
-
             dep_inst->markSrcRegReady();
+
+            // Must come after markSrcRegReady(), which is what sets
+            // CanIssue. Instructions parked in the WIB are skipped inside
+            // addIfReady() and released later by drainwib().
+            addIfReady(dep_inst);
 
             dep_inst = dependGraph.pop(dest_reg->flatIndex());
 
@@ -1516,6 +1558,7 @@ InstructionQueue::doSquash(ThreadID tid)
             // destination registers; clear anything it originated.
             for (int d = 0; d < squashed_inst->numDestRegs(); d++) {
                 PhysRegIdPtr dr = squashed_inst->renamedDestIdx(d);
+                if (dr->isFixedMapping()) { continue; }
                 if (regWaitOrigin[dr->flatIndex()] == squashed_inst->seqNum) {
                     regWaitOrigin[dr->flatIndex()] = -1;
                     regWaiting[dr->flatIndex()] = false;

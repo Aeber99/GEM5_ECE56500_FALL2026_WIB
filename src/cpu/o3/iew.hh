@@ -96,7 +96,7 @@ class IEW
 
     /** Number of cycles an in-flight load may take before it is
      * considered a cache miss (should be >= the L1D hit latency). */
-    static constexpr int missDetectThreshold = 3;
+    static constexpr int missDetectThreshold = 4;
     static constexpr int missDetectEntries = 32;
 
     // allocate a counter for a load

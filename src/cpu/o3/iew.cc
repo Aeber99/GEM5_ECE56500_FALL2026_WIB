@@ -502,8 +502,8 @@ IEW::detectMisses()
                 PhysRegIdPtr dest_reg = missedLoad->renamedDestIdx(dest_reg_idx);
                 if (!dest_reg->isFixedMapping()) {
                     instQueue.regWaitOrigin[dest_reg->flatIndex()] = load_num;
+                    instQueue.regWaiting[dest_reg->flatIndex()] = true;
                 }
-                instQueue.regWaiting[dest_reg->flatIndex()] = true;
             }
             // Also park dependents already sitting in the IQ.
             instQueue.moveDependentsToWib(missedLoad, load_num);
