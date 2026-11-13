@@ -1188,6 +1188,9 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
         ++freeEntries;
         completed_inst->memOpDone(true);
         count[tid]--;
+        unwib(completed_inst->seqNum); // stuff
+        
+
     } else if (completed_inst->isReadBarrier() ||
                completed_inst->isWriteBarrier()) {
         // Completes a non mem ref barrier
@@ -1238,7 +1241,7 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
             // graph entries would need to hold the src_reg_idx.
             dep_inst->markSrcRegReady();
 
-            addIfReady(dep_inst);
+            if (!dep_inst->inWib) { addIfReady(dep_inst); } //stuff
 
             dep_inst = dependGraph.pop(dest_reg->flatIndex());
 
@@ -1367,7 +1370,7 @@ InstructionQueue::squash(ThreadID tid)
     // Read instruction sequence number of last instruction out of the
     // time buffer.
     squashedSeqNum[tid] = fromCommit->commitInfo[tid].doneSeqNum;
-
+    squashbitvector(squashedSeqNum[tid]); //stuff
     doSquash(tid);
 
     // Also tell the memory dependence unit to squash.
@@ -1486,6 +1489,7 @@ InstructionQueue::doSquash(ThreadID tid)
             squashed_inst->setCanCommit();
             squashed_inst->clearInIQ();
 
+            movefromwib(squashed_inst); //stuff
             //Update Thread IQ Count
             count[squashed_inst->threadNumber]--;
 
