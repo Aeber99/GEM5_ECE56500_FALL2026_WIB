@@ -256,7 +256,7 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
     {
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
-            regWaitingOrigin[dest_reg] = load_num;
+            regWaitOrigin[dest_reg] = load_num;
         }
         regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
     }
@@ -281,6 +281,18 @@ InstructionQueue::movefromwib(const DynInstPtr &inst)
     inst->wibLoad = 0;
     wibinst--;
 
+    int8_t total_dest_regs = inst->numDestRegs();
+    for (int dest_reg_idx = 0;
+        dest_reg_idx < total_dest_regs;
+        dest_reg_idx++)
+    {
+        PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
+        if (!dest_reg->isFixedMapping()) {
+            regWaitOrigin[dest_reg] = -1;
+        }
+        regWaiting[dest_reg->flatIndex()] = false;
+    }
+
     missnode *node = findloadnum(load_num);
     if (node == nullptr) { return; }
     if (node->loaddep > 0) { node->loaddep--; }
@@ -299,12 +311,24 @@ InstructionQueue::activeInsts()
 
 
 void
-InstructionQueue::unwib(InstSeqNum load_num)
+InstructionQueue::unwib(DynInstPtr inst, InstSeqNum load_num)
 {
     missnode *node = findloadnum(load_num);
     if (node == nullptr) { return; } //hit
 
     node->unwib = true;
+
+    int8_t total_dest_regs = inst->numDestRegs();
+    for (int dest_reg_idx = 0;
+        dest_reg_idx < total_dest_regs;
+        dest_reg_idx++)
+    {
+        PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
+        if (!dest_reg->isFixedMapping()) {
+            regWaitOrigin[dest_reg] = -1;
+        }
+        regWaiting[dest_reg->flatIndex()] = false;
+    }
 
     //nothing was wibinst for it, free now
     if (node->loaddep == 0) { reducebitvector(load_num); }
@@ -1566,8 +1590,11 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
 
             // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting and we have space
             if ((!src_reg->isFixedMapping()) && !new_inst.isWaiting()) {
-                InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
-                movetowib(new_inst, load_seqNum) //mark as waiting and check for space
+                if (regWaiting[src_reg->flatIndex()])
+                {
+                    InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
+                    movetowib(new_inst, load_seqNum) //mark as waiting and check for space
+                }
             }
 
         }

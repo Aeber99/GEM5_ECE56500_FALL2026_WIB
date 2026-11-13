@@ -307,7 +307,7 @@ namespace gem5
       void reducebitvector(InstSeqNum load_num);
       void squashbitvector(InstSeqNum squashed_sn);
       void clearbitvector();
-      void unwib(InstSeqNum load_num);
+      void unwib(DynInstPtr inst, InstSeqNum load_num);
       unsigned drainwib();
 
     private:
