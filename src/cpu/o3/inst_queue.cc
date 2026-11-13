@@ -117,7 +117,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
     // Resize the register scoreboard.
     regScoreboard.resize(numPhysRegs);
     regWaiting.resize(numPhysRegs, false); // initialize waiting status of all regs as false
-    regWaiting.resize(regWaitOrigin, 0);
+    regWaitOrigin.resize(numPhysRegs, 0);
 
     //Initialize Mem Dependence Units
     for (ThreadID tid = 0; tid < MaxThreads; tid++) {
