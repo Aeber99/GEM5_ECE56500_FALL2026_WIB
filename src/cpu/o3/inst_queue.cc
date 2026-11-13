@@ -190,7 +190,7 @@ InstructionQueue::addbitvector(InstSeqNum load_num)
     return true;
 }
 
-missnode *
+InstructionQueue::missnode *
 InstructionQueue::findloadnum(InstSeqNum load_num)
 {
     missnode *curr = misshead;
@@ -249,6 +249,9 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
         return 0;
     }
 
+    missnode *node = findloadnum(load_num);
+    if (node == nullptr) { return 0; }
+
     int8_t total_dest_regs = inst->numDestRegs();
     for (int dest_reg_idx = 0;
         dest_reg_idx < total_dest_regs;
@@ -258,13 +261,11 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
         if (!dest_reg->isFixedMapping()) {
             regWaitOrigin[dest_reg->flatIndex()] = load_num;
         }
-        regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
+        regWaiting[dest_reg->flatIndex()] = true;
     }
 
-    missnode *node = findloadnum(load_num);
-    if (node == nullptr) { return 0; }
-
     inst->setWaiting();
+    inst->wibLoad = load_num;
     wibinst++;
     wibbedThisCycle++;
     node->loaddep++;
