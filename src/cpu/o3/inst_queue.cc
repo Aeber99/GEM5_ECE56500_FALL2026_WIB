@@ -245,7 +245,7 @@ InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
 bool
 InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
 {
-    if (inst.isWaiting() || wibinst >= wibSize || wibbedThisCycle >= wibWidth) {
+    if (inst->isWaiting() || wibinst >= wibSize || wibbedThisCycle >= wibWidth) {
         return 0;
     }
 
@@ -256,7 +256,7 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
     {
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
-            regWaitOrigin[dest_reg] = load_num;
+            regWaitOrigin[dest_reg->flatIndex()] = load_num;
         }
         regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
     }
@@ -264,7 +264,7 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
     missnode *node = findloadnum(load_num);
     if (node == nullptr) { return 0; }
 
-    inst.setWaiting();
+    inst->setWaiting();
     wibinst++;
     wibbedThisCycle++;
     node->loaddep++;
@@ -274,7 +274,7 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
 void
 InstructionQueue::movefromwib(const DynInstPtr &inst)
 {
-    if (!inst.isWaiting()) { return; }
+    if (!inst->isWaiting()) { return; }
 
     InstSeqNum load_num = inst->wibLoad;
     inst->clearWaiting();
@@ -288,7 +288,7 @@ InstructionQueue::movefromwib(const DynInstPtr &inst)
     {
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
-            regWaitOrigin[dest_reg] = -1;
+            regWaitOrigin[dest_reg->flatIndex()] = -1;
         }
         regWaiting[dest_reg->flatIndex()] = false;
     }
@@ -325,7 +325,7 @@ InstructionQueue::unwib(DynInstPtr inst, InstSeqNum load_num)
     {
         PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
         if (!dest_reg->isFixedMapping()) {
-            regWaitOrigin[dest_reg] = -1;
+            regWaitOrigin[dest_reg->flatIndex()] = -1;
         }
         regWaiting[dest_reg->flatIndex()] = false;
     }
