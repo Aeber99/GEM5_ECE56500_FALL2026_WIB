@@ -91,7 +91,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
       fuPool(params.fuPool),
       iqPolicy(params.smtIQPolicy),
       numThreads(params.numThreads),
-      numEntries(params.numIQEntries),
+      numEntries(params.numIQEntries + params.wibSize),
       totalWidth(params.issueWidth),
       commitToIEWDelay(params.commitToIEWDelay),
       iqStats(cpu, totalWidth),
@@ -169,21 +169,15 @@ InstructionQueue::~InstructionQueue()
             dependGraph.nodesTraversed, dependGraph.nodesRemoved);
 #endif
 }
+
 /* stuff */
-bool
-InstructionQueue::addMissCounter(InstSeqNum load_num) //counter to track columns of bit vectors
+int
+InstructionQueue::addbitvector(InstSeqNum load_num)
 {
     if (bitvectorcounter >= bitvectorsize) { return false; } //full
+    if (findloadnumnum(load_num) != nullptr) { return false; } //some load division from mem check
 
-    //already in (split load)
-    missnodecurr = misshead;
-    while (curr != nullptr) {
-        if (curr->load_num == load_num) { return false; }
-        curr = curr->next;
-    }
-
-    //new node at head, order doesnt matter
-    missnode node = new missnode;
+    missnode *node = new missnode;
     node->load_num = load_num;
     node->next = misshead;
     misshead = node;
@@ -192,16 +186,27 @@ InstructionQueue::addMissCounter(InstSeqNum load_num) //counter to track columns
     return true;
 }
 
+missnode *
+InstructionQueue::findloadnumnum(InstSeqNum load_num)
+{
+    missnode *curr = misshead;
+    while (curr != nullptr) {
+        if (curr->load_num == load_num) { return curr; }
+        curr = curr->next;
+    }
+    return nullptr;
+}
+
 //load came back or squashed, take out of list
 void
-InstructionQueue::reduceMissCounter(InstSeqNum load_num)
+InstructionQueue::reducebitvector(InstSeqNum load_num)
 {
     missnode dummy;
     dummy.next = misshead;
-    missnodeprev = &dummy;
+    missnode *prev = &dummy;
 
     while (prev->next != nullptr) {
-        missnode curr = prev->next;
+        missnode *curr = prev->next;
         if (curr->load_num == load_num) {
             prev->next = curr->next; //unlink
             delete curr;
@@ -211,41 +216,125 @@ InstructionQueue::reduceMissCounter(InstSeqNum load_num)
         prev = curr;
     }
     misshead = dummy.next;
-    //not found (hit or already removed) nothing happens
 }
 
-// //free whole list
-// void
-// InstructionQueue::clearMissList()
-// {
-//     while (misshead != nullptr) {
-//         missnodenext = misshead->next;
-//         delete misshead;
-//         misshead = next;
-//     }
-//     bitvectorcounter = 0;
-// }
-
 void
-InstructionQueue::squashMissList(InstSeqNum squashed_sn)
+InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
 {
     missnode dummy;
     dummy.next = misshead;
-    missnode prev = &dummy;
+    missnode *prev = &dummy;
 
     while (prev->next != nullptr) {
-        missnodecurr = prev->next;
+        missnode *curr = prev->next;
         if (curr->load_num > squashed_sn) {
             prev->next = curr->next; //unlink
             delete curr;
             bitvectorcounter--;
-            //dont move prev, prev->next is already the next node
         } else {
             prev = curr;
         }
     }
     misshead = dummy.next;
 }
+
+bool
+InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
+{
+    if (inst->inWib || wibinst >= wibSize || wibbedThisCycle >= wibWidth) { return 0; }                   
+
+    missnode *node = findloadnum(load_num);
+    if (node == nullptr) { return 0; }               
+
+    inst->inWib = 1;
+    inst->wibLoad = load_num; 
+    wibinst++;
+    wibbedThisCycle++;
+    node->loaddep++;
+    return 1;
+}
+
+void
+InstructionQueue::movefromwib(const DynInstPtr &inst)
+{
+    if (!inst->inWib) { return; }
+
+    InstSeqNum load_num = inst->wibLoad;
+    inst->inWib = 0;
+    inst->wibLoad = 0;
+    wibinst--;
+
+    missnode *node = findloadnum(load_num);
+    if (node == nullptr) { return; }
+    if (node->loaddep > 0) { node->loaddep--; }
+
+    if (node->unwib && node->loaddep == 0) { reducebitvector(load_num); }
+}
+
+
+
+
+unsigned
+InstructionQueue::activeInsts()
+{
+    return count[0] - wibinst;
+}
+
+
+void
+InstructionQueue::unwib(InstSeqNum load_num)
+{
+    missnode *node = findloadnum(load_num);
+    if (node == nullptr) { return; } //hit
+
+    node->unwib = true;
+
+    //nothing was wibinst for it, free now
+    if (node->loaddep == 0) { reducebitvector(load_num); }
+}
+
+//each cycle: unwib up to 8 whose load came back, oldest first
+unsigned
+InstructionQueue::drainwib()
+{
+    wibMoved = 0;
+
+    for (DynInstPtr inst : instList[0]) {
+        if (wibMoved >= unwibWidth) { break; }     
+        if (activeInsts() >= iqcount) { break; }    
+
+        if (!inst->inWib || inst->isSquashed()) { continue; }
+
+        missnode *node = findloadnum(inst->wibLoad);
+        if (node == nullptr || !node->unwib) { continue; } //load not back
+
+        movefromwib(inst);
+        addIfReady(inst);
+        wibMoved++;
+    }
+
+    missnode *node = misshead;
+    while (node != nullptr) {
+        missnode *next = node->next; //save, node can get deleted
+
+        if (node->unwib) {
+            bool left = false;
+            for (DynInstPtr inst : instList[0]) {
+                if (inst->inWib && inst->wibLoad == node->load_num) {
+                    left = true;
+                    break;
+                }
+            }
+            if (!left) { reducebitvector(node->load_num); }
+        }
+
+        node = next;
+    }
+
+    return wibMoved;
+}
+
+//end of stuff
 
 std::string
 InstructionQueue::name() const
@@ -294,7 +383,7 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
     ADD_STAT(fuBusyRate, statistics::units::Rate<
                 statistics::units::Count, statistics::units::Count>::get(),
              "FU busy rate (busy events/executed inst)")
-             
+
 {
     instsAdded
         .prereq(instsAdded);
@@ -609,11 +698,12 @@ InstructionQueue::resetEntries()
         }
     }
 }
-
+//changed to see actual active instrs
 unsigned
 InstructionQueue::numFreeEntries()
 {
-    return freeEntries;
+    unsigned active_room = iqcount - activeInsts();
+    return std::min(freeEntries, active_room);
 }
 
 unsigned
@@ -627,7 +717,7 @@ InstructionQueue::numFreeEntries(ThreadID tid)
 bool
 InstructionQueue::isFull()
 {
-    if (freeEntries == 0) {
+    if (freeEntries == 0|| activeInsts() >= iqcount ) {
         return(true);
     } else {
         return(false);
@@ -643,6 +733,8 @@ InstructionQueue::isFull(ThreadID tid)
         return(false);
     }
 }
+
+
 
 bool
 InstructionQueue::hasReadyInsts()
@@ -1684,5 +1776,5 @@ InstructionQueue::dumpInsts()
     }
 }
 
-} // namespace o3 
+} // namespace o3
 } // namespace gem5
