@@ -68,6 +68,7 @@ namespace o3
 IEW::IEW(CPU *_cpu, const BaseO3CPUParams &params)
     : issueToExecQueue(params.backComSize, params.forwardComSize),
       cpu(_cpu),
+      WIB(_cpu, params),
       instQueue(_cpu, this, params),
       ldstQueue(_cpu, this, params),
       fuPool(params.fuPool),
@@ -492,6 +493,7 @@ IEW::squash(ThreadID tid)
 
     // Tell the IQ to start squashing.
     instQueue.squash(tid);
+
 
     // Tell the LDSTQ to start squashing.
     ldstQueue.squash(fromCommit->commitInfo[tid].doneSeqNum, tid);

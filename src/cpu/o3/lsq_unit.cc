@@ -1220,6 +1220,14 @@ LSQUnit::trySendPacket(bool isLoad, PacketPtr data_pkt)
         }
         lsq->cachePortBusy(isLoad);
         request->packetSent();
+
+        if (isLoad && data_pkt->req->getAccessDepth() > 0) {
+            const DynInstPtr &load_inst = request->instruction();
+        if (!load_inst->isSquashed() && !load_inst->wibMiss) {
+            iewStage->instQueue.wibLoadMiss(load_inst);
+        }
+        }
+
     } else {
         if (cache_got_blocked) {
             lsq->cacheBlocked(true);

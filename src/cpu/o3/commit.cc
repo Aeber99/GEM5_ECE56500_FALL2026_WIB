@@ -545,6 +545,9 @@ Commit::squashAll(ThreadID tid)
     youngestSeqNum[tid] = lastCommitedSeqNum[tid];
 
     rob->squash(squashed_inst, tid);
+    iewStage->WIB.squash(squashed_inst);
+
+
     changedROBNumEntries[tid] = true;
 
     // Send back the sequence number of the squashed instruction.
@@ -860,6 +863,8 @@ Commit::commit()
             youngestSeqNum[tid] = squashed_inst;
 
             rob->squash(squashed_inst, tid);
+            iewStage->WIB.squash(squashed_inst);
+
             changedROBNumEntries[tid] = true;
 
             toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
