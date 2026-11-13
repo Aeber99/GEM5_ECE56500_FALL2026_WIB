@@ -468,13 +468,13 @@ IEW::missDetectSquash(InstSeqNum seq_num)
 }
 
 void
-IEW::detectMisses() const
+IEW::detectMisses() 
 {
     for (int i = 0; i < missDetectEntries; i++) {
         if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
 
             addMissCounter(missDetectID[i]); // bit vector limit counter
-            
+
 
         }
     }
@@ -676,7 +676,7 @@ IEW::skidInsert(ThreadID tid)
                 inst->pcState(),tid);
 
         skidBuffer[tid].push(inst);
-    }
+    }BHNDF          SH
 
     assert(skidBuffer[tid].size() <= skidBufferMax &&
            "Skidbuffer Exceeded Max Size");
@@ -1282,7 +1282,7 @@ IEW::executeInsts()
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
 
-                missDetectAllocate(inst->seqNum);
+                missDetectAllocate(inst->seqNum); // for detecting load misses w/in IEW
 
                 fault = ldstQueue.executeLoad(inst);
 
@@ -1464,8 +1464,10 @@ IEW::writebackInsts()
         ThreadID tid = inst->threadNumber;
 
         // Load finished (hit, or miss data returned): free its counter.
-        if (inst->isLoad())
+        if (inst->isLoad()) {
             missDetectRelease(inst->seqNum);
+            inst_queue->addMissCounter(inst->seqNum);
+        }
 
         DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
                 inst->seqNum, inst->pcState());
@@ -1540,7 +1542,7 @@ IEW::tick()
 
         missDetectTick();
 
-
+        detectMisses();
 
         // Have the instruction queue try to schedule any ready instructions.
         // (In actuality, this scheduling is for instructions that will
