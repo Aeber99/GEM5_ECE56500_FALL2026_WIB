@@ -470,14 +470,31 @@ IEW::missDetectSquash(InstSeqNum seq_num)
     }
 }
 
+// void
+// IEW::detectMisses() 
+// {
+//     for (int i = 0; i < missDetectEntries; i++) {
+//         if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
+
+//             instQueue.addbitvector(missDetectID[i]); // bit vector limit counter
+//             missDetectPtr[i]->setWaiting();
+//         }
+//     }
+// }
+
 void
-IEW::detectMisses() 
+IEW::detectMisses()
 {
     for (int i = 0; i < missDetectEntries; i++) {
-        if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
+        if (!missDetectValid[i] || missDetectCounter[i] != missDetectThreshold) {
+            continue;
+        }
 
-            instQueue.addbitvector(missDetectID[i]); // bit vector limit counter
-            missDetectPtr[i]->setWaiting();
+        missDetectCounter[i]++;  
+
+
+        if (instQueue.addbitvector(missDetectID[i])) {
+           // stuff Andy
         }
     }
 }
