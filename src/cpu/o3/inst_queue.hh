@@ -78,6 +78,14 @@ class FUPool;
 class CPU;
 class IEW;
 
+struct missnode {
+    InstSeqNum load_num = 0;   
+    bool unwib = false;        
+    unsigned loaddep = 0;     
+    missnode *next = nullptr;
+};
+
+
 /**
  * A standard instruction queue class.  It holds ready instructions, in
  * order, in seperate priority queues to facilitate the scheduling of
@@ -276,6 +284,33 @@ class InstructionQueue
 
     /** Debug function to print all instructions. */
     void printInsts();
+
+
+    //wib stuff
+    unsigned wibinst = 0;            //insts in wib
+    unsigned wibSize = 2048;        //max in wib
+    unsigned iqcount = 32;          //max active
+    unsigned wibbedThisCycle = 0;   //wibs this cycle
+    unsigned wibWidth = 8;          //max wibs per cycle
+    unsigned unwibWidth = 8;        //max unwibs per cycle
+    unsigned wibMoved = 0;          //unwibbed this cycle
+
+    bool movetowib(const DynInstPtr &inst, InstSeqNum load_num);
+    void movefromwib(const DynInstPtr &inst);
+    unsigned activeInsts();
+
+    missnode *misshead = nullptr;
+    unsigned bitvectorcounter = 0;
+    unsigned bitvectorsize = 64;
+
+    bool addbitvector(InstSeqNum load_num);
+    missnode *findload(InstSeqNum load_num);
+    void reducebitvector(InstSeqNum load_num);
+    void squashbitvector(InstSeqNum squashed_sn);
+    void clearbitvector();
+    void unwib(InstSeqNum load_num);
+    unsigned drainwib();
+
 
   private:
     /** Does the actual squashing. */
