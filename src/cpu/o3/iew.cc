@@ -470,14 +470,31 @@ IEW::missDetectSquash(InstSeqNum seq_num)
     }
 }
 
+// void
+// IEW::detectMisses() 
+// {
+//     for (int i = 0; i < missDetectEntries; i++) {
+//         if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
+
+//             instQueue.addbitvector(missDetectID[i]); // bit vector limit counter
+//             missDetectPtr[i]->setWaiting();
+//         }
+//     }
+// }
+
 void
-IEW::detectMisses() 
+IEW::detectMisses()
 {
     for (int i = 0; i < missDetectEntries; i++) {
-        if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
+        if (!missDetectValid[i] || missDetectCounter[i] != missDetectThreshold) {
+            continue;
+        }
 
-            instQueue.addbitvector(missDetectID[i]); // bit vector limit counter
-            missDetectPtr[i]->setWaiting();
+        missDetectCounter[i]++;  
+
+
+        if (instQueue.addbitvector(missDetectID[i])) {
+           // stuff Andy
         }
     }
 }
@@ -678,7 +695,7 @@ IEW::skidInsert(ThreadID tid)
                 inst->pcState(),tid);
 
         skidBuffer[tid].push(inst);
-    }BHNDF          SH
+    }
 
     assert(skidBuffer[tid].size() <= skidBufferMax &&
            "Skidbuffer Exceeded Max Size");
@@ -1284,7 +1301,7 @@ IEW::executeInsts()
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
 
-                missDetectAllocate(inst->seqNum); // for detecting load misses w/in IEW
+                missDetectAllocate(inst->seqNum, inst); // for detecting load misses w/in IEW
                 
                 fault = ldstQueue.executeLoad(inst);
 

@@ -232,7 +232,7 @@ InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
     while (prev->next != nullptr) {
         missnode *curr = prev->next;
         if (curr->load_num > squashed_sn) {
-            prev->next = curr->next; //unlink
+            prev->next = curr->next; 
             delete curr;
             bitvectorcounter--;
         } else {
@@ -303,42 +303,22 @@ unsigned
 InstructionQueue::drainwib()
 {
     wibMoved = 0;
+    wibbedThisCycle = 0;
 
     for (DynInstPtr inst : instList[0]) {
-        if (wibMoved >= unwibWidth) { break; }
-        if (activeInsts() >= iqcount) { break; }
-
-        if (!inst.isWaiting() || inst->isSquashed()) { continue; }
+        if (wibMoved >= unwibWidth || activeInsts() >= iqcount) { break; }
+        if (!inst->isWaiting() || inst->isSquashed()) { continue; }
 
         missnode *node = findloadnum(inst->wibLoad);
-        if (node == nullptr || !node->unwib) { continue; } //load not back
+        if (node == nullptr || !node->unwib) { continue; }   // load not back yet
 
         movefromwib(inst);
         addIfReady(inst);
         wibMoved++;
     }
 
-    missnode *node = misshead;
-    while (node != nullptr) {
-        missnode *next = node->next; //save, node can get deleted
-
-        if (node->unwib) {
-            bool left = false;
-            for (DynInstPtr inst : instList[0]) {
-                if (inst.isWaiting() && inst->wibLoad == node->load_num) {
-                    left = true;
-                    break;
-                }
-            }
-            if (!left) { reducebitvector(node->load_num); }
-        }
-
-        node = next;
-    }
-
     return wibMoved;
 }
-
 //end of stuff
 
 std::string
@@ -705,18 +685,17 @@ InstructionQueue::resetEntries()
         }
     }
 }
-//changed to see actual active instrs
+
 unsigned
-InstructionQueue::numFreeEntries()
+InstructionQueue::numFreeEntries() //stuff
 {
-    unsigned active_room = iqcount - activeInsts();
-    return std::min(freeEntries, active_room);
+    return (activeInsts() < iqcount) ? iqcount - activeInsts() : 0;
 }
 
 unsigned
 InstructionQueue::numFreeEntries(ThreadID tid)
 {
-    return maxEntries[tid] - count[tid];
+    return (activeInsts() < iqcount) ? iqcount - activeInsts() : 0;
 }
 
 // Might want to do something more complex if it knows how many instructions
@@ -724,23 +703,14 @@ InstructionQueue::numFreeEntries(ThreadID tid)
 bool
 InstructionQueue::isFull()
 {
-    if (freeEntries == 0|| activeInsts() >= iqcount ) {
-        return(true);
-    } else {
-        return(false);
-    }
+    return activeInsts() >= iqcount;
 }
 
 bool
 InstructionQueue::isFull(ThreadID tid)
 {
-    if (numFreeEntries(tid) == 0) {
-        return(true);
-    } else {
-        return(false);
-    }
+    return activeInsts() >= iqcount;
 }
-
 
 
 bool
