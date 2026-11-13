@@ -678,7 +678,7 @@ IEW::skidInsert(ThreadID tid)
                 inst->pcState(),tid);
 
         skidBuffer[tid].push(inst);
-    }BHNDF          SH
+    }
 
     assert(skidBuffer[tid].size() <= skidBufferMax &&
            "Skidbuffer Exceeded Max Size");

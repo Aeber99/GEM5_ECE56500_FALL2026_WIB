@@ -232,7 +232,7 @@ InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
     while (prev->next != nullptr) {
         missnode *curr = prev->next;
         if (curr->load_num > squashed_sn) {
-            prev->next = curr->next; //unlink
+            prev->next = curr->next; 
             delete curr;
             bitvectorcounter--;
         } else {
