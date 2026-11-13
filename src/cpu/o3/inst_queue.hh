@@ -287,8 +287,8 @@ namespace gem5
 
       // wib stuff
       unsigned wibinst = 0;
-      unsigned wibSize = params.wibSize;
-      unsigned iqcount = params.numIQEntries;
+      unsigned wibSize = 2048;
+      unsigned iqcount = 32;
       unsigned wibbedThisCycle = 0;
       unsigned wibWidth = 8;
       unsigned unwibWidth = 8;

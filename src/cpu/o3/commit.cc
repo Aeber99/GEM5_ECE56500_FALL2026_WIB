@@ -545,7 +545,6 @@ Commit::squashAll(ThreadID tid)
     youngestSeqNum[tid] = lastCommitedSeqNum[tid];
 
     rob->squash(squashed_inst, tid);
-    iewStage->WIB.squash(squashed_inst);
 
 
     changedROBNumEntries[tid] = true;
@@ -863,7 +862,6 @@ Commit::commit()
             youngestSeqNum[tid] = squashed_inst;
 
             rob->squash(squashed_inst, tid);
-            iewStage->WIB.squash(squashed_inst);
 
             changedROBNumEntries[tid] = true;
 
