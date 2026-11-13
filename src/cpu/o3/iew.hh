@@ -52,7 +52,6 @@
 #include "cpu/o3/limits.hh"
 #include "cpu/o3/lsq.hh"
 #include "cpu/o3/scoreboard.hh"
-#include "cpu/o3/wib.hh"
 #include "cpu/timebuf.hh"
 #include "debug/IEW.hh"
 #include "sim/probe/probe.hh"
@@ -383,8 +382,6 @@ class IEW
     void printAvailableInsts();
 
   public:
-
-    wib WIB;
 
     /** Instruction queue. */
     InstructionQueue instQueue;
