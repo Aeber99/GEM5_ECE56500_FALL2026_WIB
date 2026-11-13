@@ -969,7 +969,7 @@ InstructionQueue::scheduleReadyInsts()
         DynInstPtr issuing_inst = readyInsts[op_class].top();
         
         // if instr is waiting (in WIB, don't consider for issue)
-        if (issuing_inst.isWaiting())
+        if (issuing_inst->isWaiting())
         {
             continue;
         }
@@ -1566,7 +1566,7 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
             }
 
             // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting and we have space
-            if ((!src_reg->isFixedMapping()) && !new_inst.isWaiting()) {
+            if ((!src_reg->isFixedMapping()) && !new_inst->isWaiting()) {
                 if (regWaiting[src_reg->flatIndex()])
                 {
                     InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
