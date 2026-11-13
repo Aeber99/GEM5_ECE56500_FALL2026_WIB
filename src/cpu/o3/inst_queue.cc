@@ -97,6 +97,8 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
       iqStats(cpu, totalWidth),
       iqIOStats(cpu)
 {
+    iqcount = params.numIQEntries;
+    wibSize = params.wibSize;
     assert(fuPool);
 
     const auto &reg_classes = params.isa[0]->regClasses();
@@ -968,13 +970,7 @@ InstructionQueue::scheduleReadyInsts()
         assert(!readyInsts[op_class].empty());
 
         DynInstPtr issuing_inst = readyInsts[op_class].top();
-        
-        // if instr is waiting (in WIB, don't consider for issue)
-        if (issuing_inst->isWaiting())
-        {
-            continue;
-        }
-        
+
         if (issuing_inst->isFloating()) {
             iqIOStats.fpInstQueueReads++;
         } else if (issuing_inst->isVector()) {
@@ -1487,6 +1483,15 @@ InstructionQueue::doSquash(ThreadID tid)
             squashed_inst->clearInIQ();
 
             movefromwib(squashed_inst); //stuff
+            // A squashed (missed) load leaves stale waiting state on its
+            // destination registers; clear anything it originated.
+            for (int d = 0; d < squashed_inst->numDestRegs(); d++) {
+                PhysRegIdPtr dr = squashed_inst->renamedDestIdx(d);
+                if (regWaitOrigin[dr->flatIndex()] == squashed_inst->seqNum) {
+                    regWaitOrigin[dr->flatIndex()] = -1;
+                    regWaiting[dr->flatIndex()] = false;
+                }
+            }
             //Update Thread IQ Count
             count[squashed_inst->threadNumber]--;
 
@@ -1624,6 +1629,8 @@ InstructionQueue::addIfReady(const DynInstPtr &inst)
 {
     // If the instruction now has all of its source registers
     // available, then add it to the list of ready instructions.
+    // Instructions parked in the WIB are only released by drainwib().
+    if (inst->isWaiting()) { return; }
     if (inst->readyToIssue()) {
 
         //Add the instruction to the proper ready list.

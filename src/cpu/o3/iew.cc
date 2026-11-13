@@ -503,7 +503,7 @@ IEW::detectMisses()
                 if (!dest_reg->isFixedMapping()) {
                     instQueue.regWaitOrigin[dest_reg->flatIndex()] = load_num;
                 }
-                instQueue.regWaiting[dest_reg->flatIndex()] = missedLoad->isWaiting();
+                instQueue.regWaiting[dest_reg->flatIndex()] = true;
             }
         }
     }
