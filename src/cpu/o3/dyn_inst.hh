@@ -84,7 +84,8 @@ class DynInst : public ExecContext, public RefCounted
     typedef typename std::list<DynInstPtr>::iterator ListIt;
 
     //"wibbed" stuff
-    bool Wibbed;
+    bool inWib = false;
+    InstSeqNum wibLoad = 0;
 
 
     struct Arrays

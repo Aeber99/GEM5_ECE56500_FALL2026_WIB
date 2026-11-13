@@ -1284,7 +1284,7 @@ IEW::executeInsts()
                 // Loads will mark themselves as executed, and their writeback
                 // event adds the instruction to the queue to commit
 
-                missDetectAllocate(inst->seqNum); // for detecting load misses w/in IEW
+                missDetectAllocate(inst->seqNum, inst); // for detecting load misses w/in IEW
                 
                 fault = ldstQueue.executeLoad(inst);
 

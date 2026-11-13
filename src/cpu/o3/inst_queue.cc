@@ -705,18 +705,17 @@ InstructionQueue::resetEntries()
         }
     }
 }
-//changed to see actual active instrs
+
 unsigned
-InstructionQueue::numFreeEntries()
+InstructionQueue::numFreeEntries() //stuff
 {
-    unsigned active_room = iqcount - activeInsts();
-    return std::min(freeEntries, active_room);
+    return (activeInsts() < iqcount) ? iqcount - activeInsts() : 0;
 }
 
 unsigned
 InstructionQueue::numFreeEntries(ThreadID tid)
 {
-    return maxEntries[tid] - count[tid];
+    return (activeInsts() < iqcount) ? iqcount - activeInsts() : 0;
 }
 
 // Might want to do something more complex if it knows how many instructions
@@ -724,23 +723,14 @@ InstructionQueue::numFreeEntries(ThreadID tid)
 bool
 InstructionQueue::isFull()
 {
-    if (freeEntries == 0|| activeInsts() >= iqcount ) {
-        return(true);
-    } else {
-        return(false);
-    }
+    return activeInsts() >= iqcount;
 }
 
 bool
 InstructionQueue::isFull(ThreadID tid)
 {
-    if (numFreeEntries(tid) == 0) {
-        return(true);
-    } else {
-        return(false);
-    }
+    return activeInsts() >= iqcount;
 }
-
 
 
 bool
