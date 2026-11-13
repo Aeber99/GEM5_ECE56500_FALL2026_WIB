@@ -92,7 +92,7 @@ class IEW
     int missDetectCounter[32] = {};
     bool missDetectValid[32] = {};
     InstSeqNum missDetectID[32] = {};
-    DynInstPtr missDetectPtr[32] = {};
+    DynInstPtr missDetectPtr[32];
 
     /** Number of cycles an in-flight load may take before it is
      * considered a cache miss (should be >= the L1D hit latency). */
