@@ -68,7 +68,6 @@ namespace o3
 IEW::IEW(CPU *_cpu, const BaseO3CPUParams &params)
     : issueToExecQueue(params.backComSize, params.forwardComSize),
       cpu(_cpu),
-      WIB(_cpu, params),
       instQueue(_cpu, this, params),
       ldstQueue(_cpu, this, params),
       fuPool(params.fuPool),
@@ -477,7 +476,7 @@ IEW::detectMisses()
     for (int i = 0; i < missDetectEntries; i++) {
         if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
 
-            instQueue.addMissCounter(missDetectID[i]); // bit vector limit counter
+            instQueue.addbitvector(missDetectID[i]); // bit vector limit counter
             missDetectPtr[i]->setWaiting();
         }
     }

@@ -488,9 +488,10 @@ class InstructionQueue
      *  is basically a secondary scoreboard, and should pretty much mirror
      *  the scoreboard that exists in the rename map.
      */
-    std::vector<bool> regScoreboard;
+    std::vector<bool> regScoreboard; //indicates register ready
 
-    std::vector<bool> regWaiting; //
+    std::vector<bool> regWaiting; // indicates register waiting
+    std::vector<InstSeqNum> regWaitOrigin; // holds sequence number of the load that caused this register to wait
 
     /** Adds an instruction to the dependency graph, as a consumer. */
     bool addToDependents(const DynInstPtr &new_inst);

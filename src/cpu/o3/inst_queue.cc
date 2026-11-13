@@ -117,6 +117,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
     // Resize the register scoreboard.
     regScoreboard.resize(numPhysRegs);
     regWaiting.resize(numPhysRegs, false); // initialize waiting status of all regs as false
+    regWaiting.resize(regWaitOrigin, 0);
 
     //Initialize Mem Dependence Units
     for (ThreadID tid = 0; tid < MaxThreads; tid++) {
@@ -178,7 +179,7 @@ InstructionQueue::addbitvector(InstSeqNum load_num)
     //full
     if (bitvectorcounter >= bitvectorsize) { return false; }
     //some load division from mem check
-    if (findloadnumnum(load_num) != nullptr) { return false; }
+    if (findloadnum(load_num) != nullptr) { return false; }
 
     missnode *node = new missnode;
     node->load_num = load_num;
@@ -190,7 +191,7 @@ InstructionQueue::addbitvector(InstSeqNum load_num)
 }
 
 missnode *
-InstructionQueue::findloadnumnum(InstSeqNum load_num)
+InstructionQueue::findloadnum(InstSeqNum load_num)
 {
     missnode *curr = misshead;
     while (curr != nullptr) {
@@ -244,15 +245,14 @@ InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
 bool
 InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
 {
-    if (inst->inWib || wibinst >= wibSize || wibbedThisCycle >= wibWidth) {
+    if (inst.isWaiting() || wibinst >= wibSize || wibbedThisCycle >= wibWidth) {
         return 0;
     }
 
     missnode *node = findloadnum(load_num);
     if (node == nullptr) { return 0; }
 
-    inst->inWib = 1;
-    inst->wibLoad = load_num;
+    inst.setWaiting();
     wibinst++;
     wibbedThisCycle++;
     node->loaddep++;
@@ -262,10 +262,10 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
 void
 InstructionQueue::movefromwib(const DynInstPtr &inst)
 {
-    if (!inst->inWib) { return; }
+    if (!inst.isWaiting()) { return; }
 
     InstSeqNum load_num = inst->wibLoad;
-    inst->inWib = 0;
+    inst->clearWaiting();
     inst->wibLoad = 0;
     wibinst--;
 
@@ -308,7 +308,7 @@ InstructionQueue::drainwib()
         if (wibMoved >= unwibWidth) { break; }
         if (activeInsts() >= iqcount) { break; }
 
-        if (!inst->inWib || inst->isSquashed()) { continue; }
+        if (!inst.isWaiting() || inst->isSquashed()) { continue; }
 
         missnode *node = findloadnum(inst->wibLoad);
         if (node == nullptr || !node->unwib) { continue; } //load not back
@@ -325,7 +325,7 @@ InstructionQueue::drainwib()
         if (node->unwib) {
             bool left = false;
             for (DynInstPtr inst : instList[0]) {
-                if (inst->inWib && inst->wibLoad == node->load_num) {
+                if (inst.isWaiting() && inst->wibLoad == node->load_num) {
                     left = true;
                     break;
                 }
@@ -605,6 +605,7 @@ InstructionQueue::resetState()
     for (int i = 0; i < numPhysRegs; ++i) {
         regScoreboard[i] = false;
         regWaiting[i] = false;
+        regWaitOrigin[i] = 0;
     }
 
     for (ThreadID tid = 0; tid < MaxThreads; ++tid) {
@@ -983,7 +984,13 @@ InstructionQueue::scheduleReadyInsts()
         assert(!readyInsts[op_class].empty());
 
         DynInstPtr issuing_inst = readyInsts[op_class].top();
-
+        
+        // if instr is waiting (in WIB, don't consider for issue)
+        if (issuing_inst.isWaiting())
+        {
+            continue;
+        }
+        
         if (issuing_inst->isFloating()) {
             iqIOStats.fpInstQueueReads++;
         } else if (issuing_inst->isVector()) {
@@ -1194,7 +1201,6 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
         ++freeEntries;
         completed_inst->memOpDone(true);
         count[tid]--;
-        unwib(completed_inst->seqNum); // stuff
 
 
     } else if (completed_inst->isReadBarrier() ||
@@ -1246,8 +1252,6 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
             // ready.  However that would mean that the dependency
             // graph entries would need to hold the src_reg_idx.
             dep_inst->markSrcRegReady();
-
-            if (!dep_inst->inWib) { addIfReady(dep_inst); } //stuff
 
             dep_inst = dependGraph.pop(dest_reg->flatIndex());
 
@@ -1575,10 +1579,17 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
                 new_inst->markSrcRegReady(src_reg_idx);
             }
 
-            // if a source reg is waiting, mark instr as waiting
-            if (!src_reg->isFixedMapping()) {
+            // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting
+            if ((!src_reg->isFixedMapping()) && !new_inst.isWaiting()) {
                 if (regWaiting[src_reg->flatIndex()]) {
-                    new_inst->setWaiting();
+                    InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()];
+                    
+                    for (int i = 0; i < new_inst->numDestRegs(); i++)
+                    {
+                        
+                        regWaitOrigin[src_reg->flatIndex()] = load_seqNum;
+                    }
+                    movetowib(new_inst, load_seqNum);
                 }
             }
 
