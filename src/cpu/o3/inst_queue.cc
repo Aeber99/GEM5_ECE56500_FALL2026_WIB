@@ -173,7 +173,7 @@ InstructionQueue::~InstructionQueue()
 }
 
 /* stuff */
-int
+bool
 InstructionQueue::addbitvector(InstSeqNum load_num)
 {
     //full
@@ -1593,7 +1593,7 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
                 if (regWaiting[src_reg->flatIndex()])
                 {
                     InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
-                    movetowib(new_inst, load_seqNum) //mark as waiting and check for space
+                    movetowib(new_inst, load_seqNum); //mark as waiting and check for space
                 }
             }
 
