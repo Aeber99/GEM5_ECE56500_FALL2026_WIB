@@ -300,6 +300,7 @@ namespace gem5
        *  (transitively) to the WIB. */
       void moveDependentsToWib(const DynInstPtr &load, InstSeqNum load_num);
       void movefromwib(const DynInstPtr &inst);
+      unsigned waitInsts();
       unsigned activeInsts();
 
       missnode *misshead = nullptr;

@@ -42,6 +42,7 @@
 #include "cpu/o3/inst_queue.hh"
 
 #include <limits>
+#include <utility>
 #include <vector>
 
 #include "base/logging.hh"
@@ -373,42 +374,74 @@ InstructionQueue::drainwib()
     wibMoved = 0;
     wibbedThisCycle = 0;
 
+    bool older_in_iq = false;
+
     for (DynInstPtr inst : instList[0]) {
-        if (wibMoved >= unwibWidth || activeInsts() >= iqcount) { break; }
-        if (!inst->isWaiting() || inst->isSquashed()) { continue; }
+        if (wibMoved >= unwibWidth) { break; }
+
+        if (activeInsts() >= iqcount && older_in_iq) { break; }
+
+        if (!inst->isWaiting()) {
+            bool in_iq = inst->isMemRef() ? !inst->memOpDone()
+                                          : !inst->isIssued();
+            if (in_iq) { older_in_iq = true; }
+            continue;
+        }
+
+        if (inst->isSquashed()) { continue; }
 
         missnode *node = findloadnum(inst->wibLoad);
         if (node == nullptr || !node->unwib) { continue; }   // load not back yet
 
         movefromwib(inst);
-
-        // The instruction was parked on one load only. If another source
-        // is still produced by something in the WIB (or by a missed load
-        // that has not returned), park it again on that load instead of
-        // letting it take an IQ entry it cannot use; otherwise such
-        // instructions can fill the IQ and block the drain for good.
-        bool reparked = false;
-        for (int i = 0; i < inst->numSrcRegs() && !reparked; i++) {
-            PhysRegIdPtr src_reg = inst->renamedSrcIdx(i);
-            if (src_reg->isFixedMapping() ||
-                !regWaiting[src_reg->flatIndex()]) {
-                continue;
-            }
-            reparked = movetowib(inst, regWaitOrigin[src_reg->flatIndex()],
-                                 true);
-        }
-        if (reparked) {
-            // Never left the WIB, so it uses neither dispatch-side WIB
-            // width nor unwib width.
-            wibbedThisCycle--;
-            continue;
-        }
-
         addIfReady(inst);
         wibMoved++;
+        older_in_iq = true;
     }
 
     return wibMoved;
+}
+
+unsigned
+InstructionQueue::waitInsts()
+{
+    std::vector<std::pair<DynInstPtr, InstSeqNum>> picked;
+
+    for (const DynInstPtr &inst : instList[0]) {
+        if (wibbedThisCycle + picked.size() >= wibWidth) { break; }
+
+        if (inst->isWaiting() || inst->isSquashed() || inst->isIssued() ||
+            inst->readyToIssue()) {
+            continue;
+        }
+
+        if (inst->isNonSpeculative() || inst->isStoreConditional() ||
+            inst->isAtomic() || inst->isReadBarrier() ||
+            inst->isWriteBarrier()) {
+            continue;
+        }
+
+        for (int i = 0; i < inst->numSrcRegs(); i++) {
+            PhysRegIdPtr src_reg = inst->renamedSrcIdx(i);
+            if (src_reg->isFixedMapping() || inst->readySrcIdx(i) ||
+                !regWaiting[src_reg->flatIndex()]) {
+                continue;
+            }
+
+            InstSeqNum load_num = regWaitOrigin[src_reg->flatIndex()];
+            if (findloadnum(load_num) == nullptr) { continue; }
+
+            picked.emplace_back(inst, load_num);
+            break;
+        }
+    }
+
+    unsigned waited = 0;
+    for (const auto &entry : picked) {
+        if (movetowib(entry.first, entry.second)) { waited++; }
+    }
+
+    return waited;
 }
 //end of stuff
 
@@ -994,6 +1027,8 @@ InstructionQueue::scheduleReadyInsts()
 
     IssueStruct *i2e_info = issueToExecuteQueue->access(0);
 
+    unsigned total_waited = waitInsts();
+
     DynInstPtr mem_inst;
     while ((mem_inst = getDeferredMemInstToExecute())) {
         addReadyMemInst(mem_inst);
@@ -1022,25 +1057,6 @@ InstructionQueue::scheduleReadyInsts()
         assert(!readyInsts[op_class].empty());
 
         DynInstPtr issuing_inst = readyInsts[op_class].top();
-
-        // dont consider waiting instruction for readiness (maybe uneeded)
-        // if (issuing_inst->isWaiting())
-        // {
-        //     continue;
-        // }
-
-        int8_t total_src_regs = issuing_inst->numSrcRegs();
-        for (int src_reg_idx = 0;
-         src_reg_idx < total_src_regs;
-         src_reg_idx++)
-        {
-            PhysRegIdPtr src_reg = issuing_inst->renamedSrcIdx(src_reg_idx);
-            if(regWaiting[src_reg->flatIndex()]){
-                InstSeqNum load_num = regWaitOrigin[src_reg->flatIndex()];
-                movetowib(issuing_inst, load_num);
-            }
-
-        }
 
         if (issuing_inst->isFloating()) {
             iqIOStats.fpInstQueueReads++;
@@ -1168,7 +1184,8 @@ InstructionQueue::scheduleReadyInsts()
     // @todo If the way deferred memory instructions are handeled due to
     // translation changes then the deferredMemInsts condition should be
     // removed from the code below.
-    if (total_issued || !retryMemInsts.empty() || !deferredMemInsts.empty()) {
+    if (total_issued || total_waited || !retryMemInsts.empty() ||
+        !deferredMemInsts.empty()) {
         cpu->activityThisCycle();
     } else {
         DPRINTF(IQ, "Not able to schedule any instructions.\n");
@@ -1305,9 +1322,6 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
             
             dep_inst->markSrcRegReady();
 
-            // Must come after markSrcRegReady(), which is what sets
-            // CanIssue. Instructions parked in the WIB are skipped inside
-            // addIfReady() and released later by drainwib().
             addIfReady(dep_inst);
 
             dep_inst = dependGraph.pop(dest_reg->flatIndex());
@@ -1645,16 +1659,6 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
                 // Mark a register ready within the instruction.
                 new_inst->markSrcRegReady(src_reg_idx);
             }
-
-            // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting and we have space
-            if ((!src_reg->isFixedMapping()) && !new_inst->isWaiting()) {
-                if (regWaiting[src_reg->flatIndex()])
-                {
-                    InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
-                    movetowib(new_inst, load_seqNum); //mark as waiting and check for space
-                }
-            }
-
         }
     }
 
@@ -1704,7 +1708,7 @@ InstructionQueue::addIfReady(const DynInstPtr &inst)
 {
     // If the instruction now has all of its source registers
     // available, then add it to the list of ready instructions.
-    // Instructions parked in the WIB are only released by drainwib().
+    // Instructions waiting in the WIB are only released by drainwib().
     if (inst->isWaiting()) { return; }
     if (inst->readyToIssue()) {
 
