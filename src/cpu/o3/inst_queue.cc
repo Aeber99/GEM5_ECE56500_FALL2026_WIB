@@ -303,42 +303,22 @@ unsigned
 InstructionQueue::drainwib()
 {
     wibMoved = 0;
+    wibbedThisCycle = 0;
 
     for (DynInstPtr inst : instList[0]) {
-        if (wibMoved >= unwibWidth) { break; }
-        if (activeInsts() >= iqcount) { break; }
-
-        if (!inst.isWaiting() || inst->isSquashed()) { continue; }
+        if (wibMoved >= unwibWidth || activeInsts() >= iqcount) { break; }
+        if (!inst->isWaiting() || inst->isSquashed()) { continue; }
 
         missnode *node = findloadnum(inst->wibLoad);
-        if (node == nullptr || !node->unwib) { continue; } //load not back
+        if (node == nullptr || !node->unwib) { continue; }   // load not back yet
 
         movefromwib(inst);
         addIfReady(inst);
         wibMoved++;
     }
 
-    missnode *node = misshead;
-    while (node != nullptr) {
-        missnode *next = node->next; //save, node can get deleted
-
-        if (node->unwib) {
-            bool left = false;
-            for (DynInstPtr inst : instList[0]) {
-                if (inst.isWaiting() && inst->wibLoad == node->load_num) {
-                    left = true;
-                    break;
-                }
-            }
-            if (!left) { reducebitvector(node->load_num); }
-        }
-
-        node = next;
-    }
-
     return wibMoved;
 }
-
 //end of stuff
 
 std::string
