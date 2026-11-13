@@ -116,6 +116,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
 
     // Resize the register scoreboard.
     regScoreboard.resize(numPhysRegs);
+    regWaiting.resize(numPhysRegs, false); // initialize waiting status of all regs as false
 
     //Initialize Mem Dependence Units
     for (ThreadID tid = 0; tid < MaxThreads; tid++) {
@@ -485,6 +486,7 @@ InstructionQueue::resetState()
     // unready.
     for (int i = 0; i < numPhysRegs; ++i) {
         regScoreboard[i] = false;
+        regWaiting[i] = false;
     }
 
     for (ThreadID tid = 0; tid < MaxThreads; ++tid) {
@@ -1447,6 +1449,14 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
                 // Mark a register ready within the instruction.
                 new_inst->markSrcRegReady(src_reg_idx);
             }
+
+            // if a source reg is waiting, mark instr as waiting
+            if (!src_reg->isFixedMapping()) {
+                if (regWaiting[src_reg->flatIndex()]) {
+                    new_inst->setWaiting();
+                }
+            }
+
         }
     }
 
@@ -1485,6 +1495,7 @@ InstructionQueue::addToProducers(const DynInstPtr &new_inst)
 
         // Mark the scoreboard to say it's not yet ready.
         regScoreboard[dest_reg->flatIndex()] = false;
+        regWaiting[dest_reg->flatIndex()] = new_inst->isWaiting();
     }
 }
 

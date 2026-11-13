@@ -92,23 +92,28 @@ class IEW
     int missDetectCounter[32] = {};
     bool missDetectValid[32] = {};
     InstSeqNum missDetectID[32] = {};
+    DynInstPtr missDetectPtr[32] = {};
 
     /** Number of cycles an in-flight load may take before it is
      * considered a cache miss (should be >= the L1D hit latency). */
-    static constexpr int missDetectThreshold = 3;
+    static constexpr int missDetectThreshold = 4;
     static constexpr int missDetectEntries = 32;
 
-    /** Allocate a counter for a load (no-op if it already has one). */
-    void missDetectAllocate(InstSeqNum seq_num);
-    /** Increment all valid counters; called once per cycle. */
+    // allocate a counter for a load
+    void missDetectAllocate(InstSeqNum seq_num, DynInstPtr load_inst);
+
+    // increment all valid counters
     void missDetectTick();
-    /** Reset+invalidate the counter owned by seq_num (hit/complete). */
+
+    // reset and invalidate the counter owned by seq_num
     void missDetectRelease(InstSeqNum seq_num);
-    /** Reset+invalidate all counters owned by loads younger than seq_num. */
+
+    // reset and invalidate all counters owned by loads younger than seq_num
     void missDetectSquash(InstSeqNum seq_num);
+
     /** if any load has been in flight long enough to be classified as a cache miss, 
     allocate a "bit vector" (miss counter) 
-    mark load as waiting, allocate miss dependency list
+    mark load instr as waiting
     */
     void detectMisses();
 

@@ -95,6 +95,7 @@ class DynInst : public ExecContext, public RefCounted
         uint8_t *readySrcIdx;
     };
 
+    
     static void *operator new(size_t count, Arrays &arrays);
 
     /** BaseDynInst constructor given a binary instruction. */
@@ -139,7 +140,10 @@ class DynInst : public ExecContext, public RefCounted
 
     /** InstRecord that tracks this instructions. */
     Trace::InstRecord *traceData = nullptr;
-
+    
+    void setWaiting() { status.set(Waiting); }
+    void clearWaiting() { status.reset(Waiting); }
+    bool isWaiting() const { return status[Waiting]; }
   protected:
     enum Status
     {
@@ -168,6 +172,7 @@ class DynInst : public ExecContext, public RefCounted
                                  /// instructions ahead of it
         SerializeAfter,          /// Needs to serialize instructions behind it
         SerializeHandled,        /// Serialization has been handled
+        Waiting, // instruction is waiting (in WIB)
         NumStatus
     };
 

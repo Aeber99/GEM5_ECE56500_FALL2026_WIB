@@ -416,7 +416,7 @@ IEW::takeOverFrom()
 }
 
 void
-IEW::missDetectAllocate(InstSeqNum seq_num)
+IEW::missDetectAllocate(InstSeqNum seq_num, DynInstPtr load_inst)
 {
     int free_slot = -1;
     for (int i = 0; i < missDetectEntries; i++) {
@@ -431,6 +431,7 @@ IEW::missDetectAllocate(InstSeqNum seq_num)
         missDetectValid[free_slot] = true;
         missDetectID[free_slot] = seq_num;
         missDetectCounter[free_slot] = 0;
+        missDetectPtr[free_slot] = load_inst;
     }
 }
 
@@ -451,6 +452,7 @@ IEW::missDetectRelease(InstSeqNum seq_num)
             missDetectValid[i] = false;
             missDetectCounter[i] = 0;
             missDetectID[i] = 0;
+            missDetectPtr[i] = nullptr;
         }
     }
 }
@@ -463,6 +465,7 @@ IEW::missDetectSquash(InstSeqNum seq_num)
             missDetectValid[i] = false;
             missDetectCounter[i] = 0;
             missDetectID[i] = 0;
+            missDetectPtr[i] = nullptr;
         }
     }
 }
@@ -473,12 +476,10 @@ IEW::detectMisses()
     for (int i = 0; i < missDetectEntries; i++) {
         if (missDetectValid[i] && missDetectCounter[i] >= missDetectThreshold){
 
-            addMissCounter(missDetectID[i]); // bit vector limit counter
-
-
+            instQueue.addMissCounter(missDetectID[i]); // bit vector limit counter
+            missDetectPtr[i]->setWaiting();
         }
     }
-    return false;
 }
 
 void
@@ -1283,7 +1284,7 @@ IEW::executeInsts()
                 // event adds the instruction to the queue to commit
 
                 missDetectAllocate(inst->seqNum); // for detecting load misses w/in IEW
-
+                
                 fault = ldstQueue.executeLoad(inst);
 
                 if (inst->isTranslationDelayed() &&
@@ -1466,7 +1467,6 @@ IEW::writebackInsts()
         // Load finished (hit, or miss data returned): free its counter.
         if (inst->isLoad()) {
             missDetectRelease(inst->seqNum);
-            inst_queue->addMissCounter(inst->seqNum);
         }
 
         DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",

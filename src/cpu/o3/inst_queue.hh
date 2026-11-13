@@ -453,6 +453,8 @@ class InstructionQueue
      *  the scoreboard that exists in the rename map.
      */
     std::vector<bool> regScoreboard;
+    
+    std::vector<bool> regWaiting; // 
 
     /** Adds an instruction to the dependency graph, as a consumer. */
     bool addToDependents(const DynInstPtr &new_inst);
