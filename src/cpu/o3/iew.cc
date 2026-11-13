@@ -1504,6 +1504,10 @@ IEW::writebackInsts()
                 inst->getFault() == NoFault) {
             int dependents = instQueue.wakeDependents(inst);
 
+            if (inst->isLoad()) {
+                instQueue.unwib(inst->seqNum);
+            }
+
             for (int i = 0; i < inst->numDestRegs(); i++) {
                 // Mark register as ready if not pinned
                 if (inst->renamedDestIdx(i)->
@@ -1565,8 +1569,9 @@ IEW::tick()
         // Have the instruction queue try to schedule any ready instructions.
         // (In actuality, this scheduling is for instructions that will
         // be executed next cycle.)
+        
+        instQueue.drainwib();
         instQueue.scheduleReadyInsts();
-
         // Also should advance its own time buffers if the stage ran.
         // Not the best place for it, but this works (hopefully).
         issueToExecQueue.advance();
