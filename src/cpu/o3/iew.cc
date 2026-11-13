@@ -505,6 +505,8 @@ IEW::detectMisses()
                 }
                 instQueue.regWaiting[dest_reg->flatIndex()] = true;
             }
+            // Also park dependents already sitting in the IQ.
+            instQueue.moveDependentsToWib(missedLoad, load_num);
         }
     }
 }

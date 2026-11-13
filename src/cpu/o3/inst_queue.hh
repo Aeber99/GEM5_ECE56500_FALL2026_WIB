@@ -294,7 +294,11 @@ namespace gem5
       unsigned unwibWidth = 8;
       unsigned wibMoved = 0;
 
-      bool movetowib(const DynInstPtr &inst, InstSeqNum load_num);
+      bool movetowib(const DynInstPtr &inst, InstSeqNum load_num,
+                     bool ignore_width = false);
+      /** On a detected miss, move all dependents already in the IQ
+       *  (transitively) to the WIB. */
+      void moveDependentsToWib(const DynInstPtr &load, InstSeqNum load_num);
       void movefromwib(const DynInstPtr &inst);
       unsigned activeInsts();
 

@@ -245,9 +245,11 @@ InstructionQueue::squashbitvector(InstSeqNum squashed_sn)
 }
 
 bool
-InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
+InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num,
+                            bool ignore_width)
 {
-    if (inst->isWaiting() || wibinst >= wibSize || wibbedThisCycle >= wibWidth) {
+    if (inst->isWaiting() || inst->isSquashed() || wibinst >= wibSize ||
+        (!ignore_width && wibbedThisCycle >= wibWidth)) {
         return 0;
     }
 
@@ -272,6 +274,33 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
     wibbedThisCycle++;
     node->loaddep++;
     return 1;
+}
+
+void
+InstructionQueue::moveDependentsToWib(const DynInstPtr &load,
+                                      InstSeqNum load_num)
+{
+    std::vector<PhysRegIdPtr> work;
+    for (int i = 0; i < load->numDestRegs(); i++) {
+        PhysRegIdPtr r = load->renamedDestIdx(i);
+        if (!r->isFixedMapping()) { work.push_back(r); }
+    }
+
+    while (!work.empty()) {
+        PhysRegIdPtr reg = work.back();
+        work.pop_back();
+
+        std::vector<DynInstPtr> deps;
+        dependGraph.collect(reg->flatIndex(), deps);
+
+        for (const DynInstPtr &dep : deps) {
+            if (!movetowib(dep, load_num, true)) { continue; }
+            for (int i = 0; i < dep->numDestRegs(); i++) {
+                PhysRegIdPtr r = dep->renamedDestIdx(i);
+                if (!r->isFixedMapping()) { work.push_back(r); }
+            }
+        }
+    }
 }
 
 void

@@ -109,6 +109,13 @@ class DependencyGraph
     /** Removes and returns the newest dependent of a specific register. */
     DynInstPtr pop(RegIndex idx);
 
+    /** Appends every dependent of a register to out without removing them. */
+    void collect(RegIndex idx, std::vector<DynInstPtr> &out) const
+    {
+        for (const DepEntry *c = dependGraph[idx].next; c; c = c->next)
+            out.push_back(c->inst);
+    }
+
     /** Checks if the entire dependency graph is empty. */
     bool empty() const;
 
