@@ -1251,6 +1251,9 @@ InstructionQueue::wakeDependents(const DynInstPtr &completed_inst)
             // so that it knows which of its source registers is
             // ready.  However that would mean that the dependency
             // graph entries would need to hold the src_reg_idx.
+            
+            if (!dep_inst->isWaiting()) { addIfReady(dep_inst); } //stuff
+
             dep_inst->markSrcRegReady();
 
             dep_inst = dependGraph.pop(dest_reg->flatIndex());
@@ -1579,17 +1582,22 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
                 new_inst->markSrcRegReady(src_reg_idx);
             }
 
-            // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting
+            // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting and we have space
             if ((!src_reg->isFixedMapping()) && !new_inst.isWaiting()) {
-                if (regWaiting[src_reg->flatIndex()]) {
-                    InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()];
-                    
-                    for (int i = 0; i < new_inst->numDestRegs(); i++)
+                InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
+                if (movetowib(new_inst, load_seqNum)) //mark as waiting and check for space
+                {
+                    int8_t total_dest_regs = new_inst->numDestRegs();
+                    for (int dest_reg_idx = 0;
+                        dest_reg_idx < total_dest_regs;
+                        dest_reg_idx++)
                     {
-                        
-                        regWaitOrigin[src_reg->flatIndex()] = load_seqNum;
+                        PhysRegIdPtr dest_reg = new_inst->renamedDestIdx(dest_reg_idx);
+                        if (!dest_reg->isFixedMapping()) {
+                            regWaitingOrigin[dest_reg] = load_seqNum;
+                        }
+                        regWaiting[dest_reg->flatIndex()] = new_inst->isWaiting();
                     }
-                    movetowib(new_inst, load_seqNum);
                 }
             }
 
@@ -1631,7 +1639,9 @@ InstructionQueue::addToProducers(const DynInstPtr &new_inst)
 
         // Mark the scoreboard to say it's not yet ready.
         regScoreboard[dest_reg->flatIndex()] = false;
-        regWaiting[dest_reg->flatIndex()] = new_inst->isWaiting();
+        // moved to addToDependents cus I need to update destination register sequence numbers in there
+        // regWaiting[dest_reg->flatIndex()] = new_inst->isWaiting(); 
+
     }
 }
 
