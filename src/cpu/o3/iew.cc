@@ -1568,14 +1568,15 @@ IEW::tick()
     }
 
     if (exeStatus != Squashing) {
+        detectMisses();
+
         executeInsts();
 
         writebackInsts();
 
         missDetectTick();
 
-        detectMisses();
-
+       
         // Have the instruction queue try to schedule any ready instructions.
         // (In actuality, this scheduling is for instructions that will
         // be executed next cycle.)
