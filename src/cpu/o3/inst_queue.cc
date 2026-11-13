@@ -192,7 +192,7 @@ InstructionQueue::addbitvector(InstSeqNum load_num)
     return true;
 }
 
-InstructionQueue::missnode *
+missnode *
 InstructionQueue::findloadnum(InstSeqNum load_num)
 {
     missnode *curr = misshead;
