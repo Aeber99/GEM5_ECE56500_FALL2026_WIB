@@ -513,29 +513,6 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
 }
 
 
-
-/* stuff */
-bool InstructionQueue:: addMissCounter(InstSeqNum load_num){
-    if (bitvectorcounter > bitvectorsize){
-        bitvectorcounter++;
-        loadVector[bitvectorcounter] = load_num;
-        return true;
-    }
-    else return false
-}
-
-void  InstructionQueue:: reduceMissCounter(InstSeqNum load_num){
-    loadVector[bitvectorcounter] = 0;
-    bitvec
-}
-
-
-
-
-
-
-
-
 InstructionQueue::IQIOStats::IQIOStats(statistics::Group *parent)
     : statistics::Group(parent),
     ADD_STAT(intInstQueueReads, statistics::units::Count::get(),
