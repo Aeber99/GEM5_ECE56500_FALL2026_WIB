@@ -489,12 +489,22 @@ IEW::detectMisses()
         if (!missDetectValid[i] || missDetectCounter[i] != missDetectThreshold) {
             continue;
         }
-
         missDetectCounter[i]++;  
-
-
+        DynInstPtr missedLoad = missDetectPtr[i];
+        
+        InstSeqNum load_num = inst->seqNum;
         if (instQueue.addbitvector(missDetectID[i])) {
-           // stuff Andy
+            int8_t total_dest_regs = inst->numDestRegs();
+            for (int dest_reg_idx = 0;
+                dest_reg_idx < total_dest_regs;
+                dest_reg_idx++)
+            {
+                PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
+                if (!dest_reg->isFixedMapping()) {
+                    regWaitingOrigin[dest_reg] = load_num;
+                }
+                regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
+            }
         }
     }
 }

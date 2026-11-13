@@ -249,6 +249,18 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num)
         return 0;
     }
 
+    int8_t total_dest_regs = inst->numDestRegs();
+    for (int dest_reg_idx = 0;
+        dest_reg_idx < total_dest_regs;
+        dest_reg_idx++)
+    {
+        PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
+        if (!dest_reg->isFixedMapping()) {
+            regWaitingOrigin[dest_reg] = load_num;
+        }
+        regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
+    }
+
     missnode *node = findloadnum(load_num);
     if (node == nullptr) { return 0; }
 
@@ -1555,20 +1567,7 @@ InstructionQueue::addToDependents(const DynInstPtr &new_inst)
             // if a source reg is waiting, mark instr as waiting if it isn't already marked as waiting and we have space
             if ((!src_reg->isFixedMapping()) && !new_inst.isWaiting()) {
                 InstSeqNum load_seqNum = regWaitOrigin[src_reg->flatIndex()]; // get load seq_num
-                if (movetowib(new_inst, load_seqNum)) //mark as waiting and check for space
-                {
-                    int8_t total_dest_regs = new_inst->numDestRegs();
-                    for (int dest_reg_idx = 0;
-                        dest_reg_idx < total_dest_regs;
-                        dest_reg_idx++)
-                    {
-                        PhysRegIdPtr dest_reg = new_inst->renamedDestIdx(dest_reg_idx);
-                        if (!dest_reg->isFixedMapping()) {
-                            regWaitingOrigin[dest_reg] = load_seqNum;
-                        }
-                        regWaiting[dest_reg->flatIndex()] = new_inst->isWaiting();
-                    }
-                }
+                movetowib(new_inst, load_seqNum) //mark as waiting and check for space
             }
 
         }
