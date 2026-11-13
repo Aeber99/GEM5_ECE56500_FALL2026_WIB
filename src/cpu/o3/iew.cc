@@ -492,18 +492,18 @@ IEW::detectMisses()
         missDetectCounter[i]++;  
         DynInstPtr missedLoad = missDetectPtr[i];
         
-        InstSeqNum load_num = inst->seqNum;
+        InstSeqNum load_num = missedLoad->seqNum;
         if (instQueue.addbitvector(missDetectID[i])) {
-            int8_t total_dest_regs = inst->numDestRegs();
+            int8_t total_dest_regs = missedLoad->numDestRegs();
             for (int dest_reg_idx = 0;
                 dest_reg_idx < total_dest_regs;
                 dest_reg_idx++)
             {
-                PhysRegIdPtr dest_reg = inst->renamedDestIdx(dest_reg_idx);
+                PhysRegIdPtr dest_reg = missedLoad->renamedDestIdx(dest_reg_idx);
                 if (!dest_reg->isFixedMapping()) {
-                    regWaitingOrigin[dest_reg] = load_num;
+                    instQueue.regWaitOrigin[dest_reg->flatIndex()] = load_num;
                 }
-                regWaiting[dest_reg->flatIndex()] = inst->isWaiting();
+                instQueue.regWaiting[dest_reg->flatIndex()] = missedLoad->isWaiting();
             }
         }
     }
@@ -1515,7 +1515,7 @@ IEW::writebackInsts()
             int dependents = instQueue.wakeDependents(inst);
 
             if (inst->isLoad()) {
-                instQueue.unwib(inst->seqNum);
+                instQueue.unwib(inst, inst->seqNum);
             }
 
             for (int i = 0; i < inst->numDestRegs(); i++) {

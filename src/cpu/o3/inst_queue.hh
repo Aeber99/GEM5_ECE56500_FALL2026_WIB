@@ -479,18 +479,18 @@ namespace gem5
 
       /** The sequence number of the squashed instruction. */
       InstSeqNum squashedSeqNum[MaxThreads];
-
+      public:
     /** A cache of the recently woken registers.  It is 1 if the register
      *  has been woken up recently, and 0 if the register has been added
      *  to the dependency graph and has not yet received its value.  It
      *  is basically a secondary scoreboard, and should pretty much mirror
      *  the scoreboard that exists in the rename map.
      */
+    
     std::vector<bool> regScoreboard; //indicates register ready
-
     std::vector<bool> regWaiting; // indicates register waiting
     std::vector<InstSeqNum> regWaitOrigin; // holds sequence number of the load that caused this register to wait
-
+      private:
       /** Adds an instruction to the dependency graph, as a consumer. */
       bool addToDependents(const DynInstPtr &new_inst);
 
