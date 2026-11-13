@@ -1034,8 +1034,11 @@ InstructionQueue::scheduleReadyInsts()
          src_reg_idx < total_src_regs;
          src_reg_idx++)
         {
-            PhysRegIdPtr src_reg = new_inst->renamedSrcIdx(src_reg_idx);
-            if(src_reg->flat)
+            PhysRegIdPtr src_reg = issuing_inst->renamedSrcIdx(src_reg_idx);
+            if(regWaiting[src_reg->flatIndex()]){
+                InstSeqNum load_num = regWaitOrigin[src_reg->flatIndex()];
+                movetowib(issuing_inst, load_num);
+            }
 
         }
 
