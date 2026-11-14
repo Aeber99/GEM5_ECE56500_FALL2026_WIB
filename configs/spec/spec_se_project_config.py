@@ -160,6 +160,8 @@ parser.add_argument("--fp-iq-size", type=int, default=32,
                     help="Floating Point Issue Queue size (default: 32)")
 parser.add_argument("--lsq-size", type=int, default=64,
                     help="Load/Store Queue size (default: 64)")
+parser.add_argument("--wib-size", type=int, default=2048,
+                    help="WIB size (default: 2048)")
 parser.add_argument("--fetch-queue-size", type=int, default=8,
                     help="Instruction Fetch Queue size (default: 8)")
 
@@ -324,6 +326,8 @@ def configure_table1_cpu(cpu, cpu_index):
     # Queue Size Parameters
     if hasattr(cpu, 'numROBEntries'):
         cpu.numROBEntries = args.rob_size
+    if hasattr(cpu, 'wibSize'):
+        cpu.wibSize = args.wib_size
     if hasattr(cpu, 'numIQEntries'):
         cpu.numIQEntries = args.iq_size
     if hasattr(cpu, 'LQEntries'):
@@ -446,6 +450,7 @@ for i in range(np):
         system.cpu[i].issueWidth = args.issue_width
         system.cpu[i].renameWidth = args.rename_width
         system.cpu[i].squashWidth = args.squash_width
+        system.cpu[i].wibSize = args.wib_size
         system.cpu[i].dispatchWidth = args.dispatch_width
         system.cpu[i].wbWidth = args.writeback_width
         system.cpu[i].numROBEntries = args.rob_size
