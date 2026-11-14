@@ -272,6 +272,7 @@ InstructionQueue::movetowib(const DynInstPtr &inst, InstSeqNum load_num,
     inst->setWaiting();
     inst->wibLoad = load_num;
     wibinst++;
+    // count[0]--;
     wibbedThisCycle++;
     node->loaddep++;
     return 1;
@@ -313,6 +314,7 @@ InstructionQueue::movefromwib(const DynInstPtr &inst)
     inst->clearWaiting();
     inst->wibLoad = 0;
     wibinst--;
+    // count[0]++;
 
     int8_t total_dest_regs = inst->numDestRegs();
     for (int dest_reg_idx = 0;
@@ -339,6 +341,7 @@ InstructionQueue::movefromwib(const DynInstPtr &inst)
 unsigned
 InstructionQueue::activeInsts()
 {
+    assert(wibinst <= count[0]);
     return count[0] - wibinst;
 }
 

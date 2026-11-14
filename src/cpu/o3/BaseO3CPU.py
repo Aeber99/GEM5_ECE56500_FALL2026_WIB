@@ -152,7 +152,7 @@ class BaseO3CPU(BaseCPU):
     numPhysCCRegs = Param.Unsigned(0, "Number of physical cc registers")
     numIQEntries = Param.Unsigned(32, "Number of instruction queue entries") #changed to paper value
     numIQEntries = Param.Unsigned(64, "Number of instruction queue entries")
-    wibSize = Param.Unsigned(2048, "Number of WIB entries")
+    wibSize = Param.Unsigned(128, "Number of WIB entries")
     numROBEntries = Param.Unsigned(192, "Number of reorder buffer entries")
 
     smtNumFetchingThreads = Param.Unsigned(1, "SMT Number of Fetching Threads")
